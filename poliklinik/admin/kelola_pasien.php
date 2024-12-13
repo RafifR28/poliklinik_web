@@ -36,7 +36,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $result = $conn->query($sql);
         $row = $result->fetch_assoc();
         $count = $row['count'] + 1;
-        $no_rm = $currentYearMonth . '-' . $count;
+        $no_rm = $currentYearMonth . '-' . str_pad($count, 3, '0', STR_PAD_LEFT);
 
         $sql = "INSERT INTO pasien (nama, alamat, no_ktp, no_hp, no_rm) VALUES (?, ?, ?, ?, ?)";
         if ($stmt = $conn->prepare($sql)) {
