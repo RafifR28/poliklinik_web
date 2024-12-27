@@ -17,6 +17,69 @@ $result_dokter = $conn->query($sql_dokter);
 
 $sql_poli = "SELECT * FROM poli";
 $result_poli = $conn->query($sql_poli);
+
+$edit_dokter = null;
+if (isset($_GET['edit'])) {
+    $id_dokter = $_GET['edit'];
+    $sql_edit_dokter = "SELECT dokter.*, login_dokter.username FROM dokter 
+                        INNER JOIN login_dokter ON dokter.id = login_dokter.id 
+                        WHERE dokter.id = ?";
+    $stmt_edit = $conn->prepare($sql_edit_dokter);
+    $stmt_edit->bind_param("i", $id_dokter);
+    $stmt_edit->execute();
+    $result_edit = $stmt_edit->get_result();
+    $edit_dokter = $result_edit->fetch_assoc();
+    $stmt_edit->close();
+}
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if (isset($_POST['add_dokter'])) {
+        $nama = $_POST['nama'];
+        $alamat = $_POST['alamat'];
+        $no_hp = $_POST['no_hp'];
+        $id_poli = $_POST['id_poli'];
+        $username = $_POST['username'];
+        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+        $sql_insert_dokter = "INSERT INTO dokter (nama, alamat, no_hp, id_poli) VALUES (?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql_insert_dokter);
+        $stmt->bind_param("ssii", $nama, $alamat, $no_hp, $id_poli);
+        if ($stmt->execute()) {
+            $id_dokter = $stmt->insert_id;
+            $sql_insert_login = "INSERT INTO login_dokter (id, username, password) VALUES (?, ?, ?)";
+            $stmt_login = $conn->prepare($sql_insert_login);
+            $stmt_login->bind_param("iss", $id_dokter, $username, $password);
+            $stmt_login->execute();
+            $stmt_login->close();
+        }
+        $stmt->close();
+        header("Location: kelola_dokter.php");
+        exit();
+    } elseif (isset($_POST['edit_dokter'])) {
+        $id_dokter = $_POST['id_dokter'];
+        $nama = $_POST['nama'];
+        $alamat = $_POST['alamat'];
+        $no_hp = $_POST['no_hp'];
+        $id_poli = $_POST['id_poli'];
+        $username = $_POST['username'];
+        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+        $sql_update_dokter = "UPDATE dokter SET nama = ?, alamat = ?, no_hp = ?, id_poli = ? WHERE id = ?";
+        $stmt_update_dokter = $conn->prepare($sql_update_dokter);
+        $stmt_update_dokter->bind_param("ssiii", $nama, $alamat, $no_hp, $id_poli, $id_dokter);
+        $stmt_update_dokter->execute();
+        $stmt_update_dokter->close();
+
+        $sql_update_login = "UPDATE login_dokter SET username = ?, password = ? WHERE id = ?";
+        $stmt_update_login = $conn->prepare($sql_update_login);
+        $stmt_update_login->bind_param("ssi", $username, $password, $id_dokter);
+        $stmt_update_login->execute();
+        $stmt_update_login->close();
+
+        header("Location: kelola_dokter.php");
+        exit();
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -230,24 +293,28 @@ $result_poli = $conn->query($sql_poli);
     <div class="content">
         <div class="form-container">
             <h3 id="form-title">Tambah Dokter</h3>
-            <form id="dokterForm" action="tambah_dokter.php" method="POST">
-                <input type="hidden" id="dokter_id" name="id">
+            <form id="dokterForm" action="kelola_dokter.php" method="POST">
+                <input type="hidden" id="dokter_id" name="id_dokter" value="<?= $edit_dokter['id'] ?? ''; ?>">
                 <label for="nama_dokter">Nama Dokter:</label>
-                <input type="text" id="nama_dokter" name="nama" required>
+                <input type="text" id="nama_dokter" name="nama" value="<?= $edit_dokter['nama'] ?? ''; ?>" required>
                 <label for="alamat">Alamat:</label>
-                <input type="text" id="alamat" name="alamat" required>
+                <input type="text" id="alamat" name="alamat" value="<?= $edit_dokter['alamat'] ?? ''; ?>" required>
                 <label for="no_hp">No HP:</label>
-                <input type="text" id="no_hp" name="no_hp" maxlength="15" required>
+                <input type="text" id="no_hp" name="no_hp" maxlength="15" value="<?= $edit_dokter['no_hp'] ?? ''; ?>" required>
                 <label for="id_poli">Poli:</label>
                 <select id="id_poli" name="id_poli" required>
                     <option value="" disabled selected>Pilih Poli</option>
                     <?php
                     while($row = $result_poli->fetch_assoc()) {
-                        echo "<option value='" . $row['id'] . "'>" . $row['nama_poli'] . "</option>";
+                        echo "<option value='" . $row['id'] . "' " . (isset($edit_dokter) && $edit_dokter['id_poli'] == $row['id'] ? 'selected' : '') . ">" . $row['nama_poli'] . "</option>";
                     }
                     ?>
                 </select>
-                <button type="submit" class="btn" id="submitBtn">Tambah</button>
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" value="<?= $edit_dokter['username'] ?? ''; ?>" required>
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+                <button type="submit" name="<?= isset($edit_dokter) ? 'edit_dokter' : 'add_dokter'; ?>" class="btn" id="submitBtn"><?= isset($edit_dokter) ? 'Simpan' : 'Tambah'; ?></button>
             </form>
         </div>
 
@@ -273,7 +340,7 @@ $result_poli = $conn->query($sql_poli);
                     echo "<td>" . $row["no_hp"] . "</td>";
                     echo "<td>" . $row["nama_poli"] . "</td>";
                     echo "<td>
-                            <button class='btn' onclick=\"editDokter('" . $row['id'] . "', '" . $row['nama'] . "', '" . $row['alamat'] . "', '" . $row['no_hp'] . "', '" . $row['id_poli'] . "')\">Edit</button>
+                            <a href='kelola_dokter.php?edit=" . $row['id'] . "' class='btn'>Edit</a>
                             <button class='btn' onclick=\"openDeleteModal('" . $row['id'] . "')\">Hapus</button>
                           </td>";
                     echo "</tr>";
@@ -297,17 +364,6 @@ $result_poli = $conn->query($sql_poli);
     </div>
 
     <script>
-        function editDokter(id, nama, alamat, no_hp, id_poli) {
-            document.getElementById('dokter_id').value = id;
-            document.getElementById('nama_dokter').value = nama;
-            document.getElementById('alamat').value = alamat;
-            document.getElementById('no_hp').value = no_hp;
-            document.getElementById('id_poli').value = id_poli;
-            document.getElementById('form-title').innerText = 'Edit Dokter';
-            document.getElementById('submitBtn').innerText = 'Simpan';
-            document.getElementById('dokterForm').action = 'edit_dokter.php';
-        }
-
         function openDeleteModal(id) {
             document.getElementById('delete_id').value = id;
             document.getElementById('deleteModal').style.display = 'block';

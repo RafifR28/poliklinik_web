@@ -1,54 +1,30 @@
 <?php
 session_start();
+require_once '../admin/koneksi.php';
 
-$conn = new mysqli('localhost', 'root', '', 'poliklinik_db');
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $username = $_POST["username"];
+    $password = $_POST["password"];
 
-if ($conn->connect_error) {
-    die("Koneksi gagal: " . $conn->connect_error);
-}
-
-$error = '';
-
-function hashPasswordToDatabase($conn, $username, $password) {
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    $query = $conn->prepare("UPDATE login_dokter SET password = ? WHERE username = ?");
-    $query->bind_param('ss', $hashedPassword, $username);
-
-    if ($query->execute()) {
-        echo "Password berhasil di-hash untuk username: $username.<br>";
-    } else {
-        echo "Gagal memperbarui password: " . $query->error . "<br>";
-    }
-    $query->close();
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'];
-    $password = $_POST['password'];
-
-    $query = $conn->prepare("SELECT * FROM login_dokter WHERE username = ?");
-    $query->bind_param('s', $username);
-    $query->execute();
-    $result = $query->get_result();
-
-    if ($result->num_rows > 0) {
-        $dokter = $result->fetch_assoc();
-
-        if (password_verify($password, $dokter['password'])) {
-            $_SESSION['dokter'] = $dokter['username'];
+    $sql = "SELECT id, username, password FROM login_dokter WHERE username = ?";
+    if ($stmt = $conn->prepare($sql)) {
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $stmt->bind_result($id, $username, $hashed_password);
+        if ($stmt->fetch() && password_verify($password, $hashed_password)) {
+            $_SESSION['dokter'] = [
+                'id' => $id,
+                'username' => $username
+            ];
             header("Location: dashboard_dokter.php");
             exit();
         } else {
-            $error = "Password salah.";
+            $error = "Username atau password salah!";
         }
-    } else {
-        $error = "Username tidak ditemukan.";
+        $stmt->close();
     }
-
-    $query->close();
+    $conn->close();
 }
-
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -125,8 +101,8 @@ $conn->close();
                 <input type="password" id="password" name="password" required>
                 <input type="submit" value="Login">
             </form>
-            <?php if (isset($error_message)): ?>
-                <p class="error"><?php echo $error_message; ?></p>
+            <?php if (isset($error)): ?>
+                <p class="error"><?php echo $error; ?></p>
             <?php endif; ?>
         </div>
     </main>

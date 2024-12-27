@@ -1,21 +1,19 @@
 <?php
 session_start();
-header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-header("Pragma: no-cache");
-header("Expires: 0");
+require_once '../admin/koneksi.php';
 
 if (!isset($_SESSION['dokter']['id'])) {
     header("Location: login_dokter.php");
     exit();
 }
 
-require_once '../admin/koneksi.php';
-
 $id_dokter = $_SESSION['dokter']['id'];
-$sql = "SELECT jp.*, d.nama AS nama_dokter, p.nama_poli 
-        FROM jadwal_periksa jp
-        JOIN dokter d ON jp.id_dokter = d.id
-        JOIN poli p ON d.id_poli = p.id
+
+$sql = "SELECT dp.id, p.nama, dp.keluhan, 
+        (SELECT COUNT(*) FROM periksa pr WHERE pr.id_daftar_poli = dp.id) AS periksa_exists
+        FROM daftar_poli dp
+        JOIN pasien p ON dp.id_pasien = p.id
+        JOIN jadwal_periksa jp ON dp.id_jadwal = jp.id
         WHERE jp.id_dokter = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $id_dokter);
@@ -28,7 +26,7 @@ $result = $stmt->get_result();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Dokter</title>
+    <title>Daftar Periksa Pasien</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -124,35 +122,27 @@ $result = $stmt->get_result();
         th {
             background-color: #f4f4f4;
         }
-
-        form {
-            display: inline;
-        }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <img src="../assets/img/hospital.svg" alt="Hospital Logo" width="50px">
         <h2>Panel Dokter</h2>
-        <a href="dashboard_dokter.php" class="active">Jadwal Periksa</a>
-        <a href="daftar_periksa_pasien.php">Memeriksa Pasien</a>
+        <a href="dashboard_dokter.php">Jadwal Periksa</a>
+        <a href="daftar_periksa_pasien.php" class="active">Memeriksa Pasien</a>
         <a href="riwayat_pasien.php">Riwayat Pasien</a>
         <a href="profil_dokter.php">Profil</a>
         <a href="logout.php">Logout</a>
     </div>
 
     <div class="content">
-        <h1>Jadwal Periksa</h1>
-        <a href="tambah_jadwal_periksa.php" class="btn">Tambah Jadwal Periksa</a>
+        <h1>Daftar Periksa Pasien</h1>
         <table>
             <thead>
                 <tr>
                     <th>No</th>
-                    <th>Hari</th>
-                    <th>Jam Mulai</th>
-                    <th>Jam Selesai</th>
-                    <th>Poli</th>
-                    <th>Status</th>
+                    <th>Nama Pasien</th>
+                    <th>Keluhan</th>
                     <th>Aksi</th>
                 </tr>
             </thead>
@@ -162,19 +152,20 @@ $result = $stmt->get_result();
                     <?php while ($row = $result->fetch_assoc()): ?>
                         <tr>
                             <td><?= $no++; ?></td>
-                            <td><?= htmlspecialchars($row['hari']); ?></td>
-                            <td><?= htmlspecialchars($row['jam_mulai']); ?></td>
-                            <td><?= htmlspecialchars($row['jam_selesai']); ?></td>
-                            <td><?= htmlspecialchars($row['nama_poli']); ?></td>
-                            <td><?= $row['status'] ? 'Aktif' : 'Tidak Aktif'; ?></td>
+                            <td><?= htmlspecialchars($row['nama']); ?></td>
+                            <td><?= htmlspecialchars($row['keluhan']); ?></td>
                             <td>
-                                <a href="edit_jadwal_periksa.php?id=<?= $row['id']; ?>" class="btn">Ubah</a>
+                                <?php if ($row['periksa_exists'] > 0): ?>
+                                    <a href="periksa_pasien.php?id=<?= $row['id']; ?>" class="btn">Edit</a>
+                                <?php else: ?>
+                                    <a href="periksa_pasien.php?id=<?= $row['id']; ?>" class="btn">Periksa</a>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="8">Tidak ada jadwal periksa.</td>
+                        <td colspan="4">Tidak ada data periksa pasien.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
