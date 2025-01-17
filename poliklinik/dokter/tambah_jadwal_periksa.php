@@ -15,6 +15,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $jam_selesai = $_POST['jam_selesai'];
     $status = $_POST['status'];
 
+    // Check if the doctor already has a schedule for the selected day
+    $sql_check = "SELECT * FROM jadwal_periksa WHERE id_dokter = ? AND hari = ?";
+    $stmt_check = $conn->prepare($sql_check);
+    $stmt_check->bind_param("is", $id_dokter, $hari);
+    $stmt_check->execute();
+    $result_check = $stmt_check->get_result();
+
+    if ($result_check->num_rows > 0) {
+        echo "Jumlah praktek tidak boleh lebih dari 1";
+        exit();
+    }
+
     $sql = "INSERT INTO jadwal_periksa (id_dokter, hari, jam_mulai, jam_selesai, status) VALUES (?, ?, ?, ?, ?)";
     if ($stmt = $conn->prepare($sql)) {
         $stmt->bind_param("isssi", $id_dokter, $hari, $jam_mulai, $jam_selesai, $status);
